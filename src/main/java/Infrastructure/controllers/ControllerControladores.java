@@ -2,10 +2,8 @@ package Infrastructure.controllers;
 
 import Application.services.DarAcceso.LoginService;
 import Application.services.DarAcceso.RegistroService;
-import Application.services.LeccionService;
 import Application.services.ListarCursosService;
 import Application.services.PomodoroTimer;
-import Application.services.SesionEstudioService;
 import Application.services.SesionPomodoroService;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Scene;
@@ -23,10 +21,8 @@ import java.util.function.Function;
 public class ControllerControladores {
 
     // ======== Servicios de aplicación ========
-    private final LeccionService leccionService;
     private final ListarCursosService listarCursosService;
     private final PomodoroTimer pomodoroTimer;
-    private final SesionEstudioService sesionEstudioService;
     private final SesionPomodoroService sesionPomodoroService;
     private final LoginService loginService;
     private final RegistroService registroService;
@@ -38,22 +34,19 @@ public class ControllerControladores {
     private RegistroController registroController;
     private LoginController loginController;
 
-    // Factory sirve para saber cual controlador devolver
+    // ======== Factory ========
     private Function<Class<?>, Object> factory;
 
-    // Constructor (inyecta todos los servicios)
-    // SE van a guardar en variables y después se llama a inicializar() para crear los controladores
-    public ControllerControladores(LeccionService leccionService,
-                                   ListarCursosService listarCursosService,
-                                   PomodoroTimer pomodoroTimer,
-                                   SesionEstudioService sesionEstudioService,
-                                   SesionPomodoroService sesionPomodoroService,
-                                   LoginService loginService,
-                                   RegistroService registroService) {
-        this.leccionService        = Objects.requireNonNull(leccionService, "leccionService requerido");
+    // ======== Constructor ========
+    public ControllerControladores(
+            ListarCursosService listarCursosService,
+            PomodoroTimer pomodoroTimer,
+            SesionPomodoroService sesionPomodoroService,
+            LoginService loginService,
+            RegistroService registroService
+    ) {
         this.listarCursosService   = Objects.requireNonNull(listarCursosService, "listarCursosService requerido");
         this.pomodoroTimer         = Objects.requireNonNull(pomodoroTimer, "pomodoroTimer requerido");
-        this.sesionEstudioService  = Objects.requireNonNull(sesionEstudioService, "sesionEstudioService requerido");
         this.sesionPomodoroService = Objects.requireNonNull(sesionPomodoroService, "sesionPomodoroService requerido");
         this.loginService          = Objects.requireNonNull(loginService, "loginService requerido");
         this.registroService       = Objects.requireNonNull(registroService, "registroService requerido");
@@ -61,20 +54,18 @@ public class ControllerControladores {
         inicializar();
     }
 
-
-
-    // Inicialización de controladores
+    // ======== Inicialización de controladores ========
     private void inicializar() {
         // Controladores sin dependencias
         this.helloController  = new HelloController();
 
         // Controladores con dependencias
-        this.principalController = new PrincipalController(listarCursosService, leccionService);
+        this.principalController = new PrincipalController(listarCursosService);
         this.pomodoroController  = new PomodoroController(sesionPomodoroService, pomodoroTimer);
         this.loginController     = new LoginController(loginService);
         this.registroController  = new RegistroController(registroService);
 
-        // aquí se decide que controlador devolver según la clase que pida FXMLLoader
+        // Factory que define qué controlador entregar al FXMLLoader
         this.factory = (Class<?> clazz) -> {
             try {
                 if (clazz == HelloController.class)      return helloController;
@@ -83,53 +74,54 @@ public class ControllerControladores {
                 if (clazz == RegistroController.class)   return registroController;
                 if (clazz == LoginController.class)      return loginController;
 
-                // si se pide un controlador no existe se crea de forma manual
+                // Si el controlador no está registrado, se crea una instancia nueva
                 return clazz.getDeclaredConstructor().newInstance();
             } catch (Exception e) {
                 throw new RuntimeException("No se pudo crear controlador: " + clazz.getName(), e);
             }
         };
 
-        // SE pasa la factory a los controladores que cambian de pantalla
-        // Así los controladores pueden cargar otras vistas sin perder la misma instancia de factory
+        // Enlazar factory en controladores que manejan navegación
         helloController.setControllerFactory(factory);
         loginController.setControllerFactory(factory);
         registroController.setControllerFactory(factory);
         pomodoroController.setControllerFactory(factory);
-
     }
 
-    //  Getters para acceso externo
+    // ======== Getters ========
     public HelloController getHelloController()         { return helloController; }
     public PrincipalController getPrincipalController() { return principalController; }
     public PomodoroController getPomodoroController()   { return pomodoroController; }
     public RegistroController getRegistroController()   { return registroController; }
     public LoginController getLoginController()         { return loginController; }
 
-    // Se devuelve la función factory para que el FXMLLoader la use al cargar las vistas
+    // ======== Factory pública (para FXMLLoader) ========
     public Function<Class<?>, Object> controllerFactory() {
         return this.factory;
     }
 
-    // Reinicializar controladores
+    // ======== Reinicializar controladores ========
     public void reinicializar() {
         inicializar();
     }
 
+    // ======== Cargar vista inicial (Hello) ========
     public void mostrarVistaInicial(Stage stage) {
         try {
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/views/hello-view.fxml"));
 
-            // FXMLLoader va a espera un "Callback", por eso se adapta esta forma
+            // Adaptación de factory al tipo Callback que espera FXMLLoader
             loader.setControllerFactory(clazz -> this.controllerFactory().apply(clazz));
+
+            System.out.println("Ruta encontrada: " + getClass().getResource("/views/hello-view.fxml"));
 
             Scene scene = new Scene(loader.load());
             stage.setScene(scene);
+            stage.show();
 
         } catch (Exception e) {
             System.err.println("❌ Error al cargar la vista inicial: " + e.getMessage());
             e.printStackTrace();
         }
     }
-
 }

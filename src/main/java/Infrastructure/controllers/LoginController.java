@@ -61,7 +61,6 @@ public class LoginController {
         String correo = correoField.getText();
         String pass   = passwordField.getText();
 
-        // Validación de campos vacíos
         if (correo == null || correo.isBlank()) {
             uiHelper.showError("Error de validación", "Debe ingresar un correo.");
             return;
@@ -76,13 +75,13 @@ public class LoginController {
                 throw new IllegalStateException("LoginService no inicializado correctamente.");
             }
 
-            // Autenticación mediante el servicio
+            // 🔹 Autenticación mediante el servicio
             UsuarioResponse usuario = service.login(new LoginRequest(correo, pass));
 
-            // Ejemplo: guardar el usuario actual en sesión (opcional)
-            // AppServices.setUsuarioActual(usuario);
+            // ✅ Guardar el usuario actual en sesión global
+            AppServices.setUsuarioActual(usuario);
 
-            // Redirección al menú principal si el login es exitoso
+            // ✅ Redirección al menú principal
             navigator.goTo("/views/Principal.fxml", "STELLA - Principal", controllerFactory, correoField);
 
         } catch (IllegalArgumentException ex) {
@@ -91,6 +90,7 @@ public class LoginController {
             uiHelper.showError("Error inesperado", ex.getMessage());
         }
     }
+
 
     // Regresa a la vista principal (pantalla de bienvenida)
     @FXML

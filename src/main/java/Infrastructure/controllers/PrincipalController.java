@@ -1,11 +1,9 @@
-
 package Infrastructure.controllers;
 
 import Application.config.AppServices;
 import Application.dtos.Listado_Cursos.CursoResponse;
 import Application.dtos.Listado_Cursos.CursosResponse;
 import Application.dtos.Listado_Cursos.InscripcionRequest;
-import Application.services.LeccionService;
 import Application.services.ListarCursosService;
 import Infrastructure.ui.AyudaUI;
 import Infrastructure.ui.Navigacion;
@@ -23,9 +21,12 @@ import java.net.URL;
 import java.util.ResourceBundle;
 import java.util.stream.Collectors;
 
-// Controlador de la vista Principal.fxml
-// Se encarga de mostrar los cursos del usuario, los cursos disponibles,
-// y manejar la navegación y las interacciones de la pantalla principal de la app.
+/**
+ * Controlador de la vista Principal.fxml
+ * Gestiona los cursos del usuario (inscritos y disponibles),
+ * permite inscribirse en nuevos cursos, buscar por nombre
+ * y manejar la navegación principal.
+ */
 public class PrincipalController implements Initializable {
 
     // ====== ELEMENTOS FXML ======
@@ -43,30 +44,40 @@ public class PrincipalController implements Initializable {
 
     // ====== DEPENDENCIAS ======
     private final ListarCursosService listarCursosService;
-    private final LeccionService leccionService;
     private final AyudaUI uiHelper = new AyudaUI();
     private final Navigacion navigator = new Navigacion();
 
     // ====== VARIABLES DE ESTADO ======
-    private int usuarioActualId = AppServices.getUsuarioActual().id();
+    private Integer usuarioActualId; // ahora se obtiene dinámicamente
     private CursosResponse cursosActuales;
 
     // ====== CONSTRUCTOR ======
-    public PrincipalController(ListarCursosService listarCursosService, LeccionService leccionService) {
+    public PrincipalController(ListarCursosService listarCursosService) {
         this.listarCursosService = listarCursosService;
-        this.leccionService = leccionService;
     }
 
     // ====== CICLO DE VIDA ======
     @Override
     public void initialize(URL url, ResourceBundle rb) {
-        cargarCursosDesdeBD();
+        // Verificamos si hay un usuario logueado antes de cargar datos
+        if (AppServices.getUsuarioActual() != null) {
+            usuarioActualId = AppServices.getUsuarioActual().id();
+            cargarCursosDesdeBD();
+        } else {
+            uiHelper.showError(
+                    "Error de sesión",
+                    "No hay un usuario autenticado. Por favor, inicia sesión primero."
+            );
+        }
+
         configurarFlechas();
         configurarBusqueda();
     }
 
     // ====== CARGA DE DATOS ======
     private void cargarCursosDesdeBD() {
+        if (usuarioActualId == null) return;
+
         try {
             cursosActuales = listarCursosService.obtenerCursosCompletos(usuarioActualId);
             cargarMisCursos();
@@ -76,11 +87,10 @@ public class PrincipalController implements Initializable {
         }
     }
 
-    // Carga los cursos en los que el usuario está inscrito.
     private void cargarMisCursos() {
         misCursosContainer.getChildren().clear();
 
-        if (cursosActuales.cursosUsuario().isEmpty()) {
+        if (cursosActuales == null || cursosActuales.cursosUsuario().isEmpty()) {
             noCoursesLabel.setVisible(true);
             return;
         }
@@ -92,7 +102,6 @@ public class PrincipalController implements Initializable {
         }
     }
 
-    // Crea visualmente una tarjeta de curso inscrito.
     private VBox crearTarjetaCurso(CursoResponse curso) {
         VBox card = new VBox(10);
         card.setPrefSize(300, 200);
@@ -107,14 +116,18 @@ public class PrincipalController implements Initializable {
 
         Button btn = new Button("Continuar");
         btn.setStyle("-fx-background-color: #4A90E2; -fx-text-fill: white; -fx-font-weight: bold;");
-        btn.setOnAction(e -> uiHelper.showInfo("Curso: " + curso.titulo(), "El contenido estará disponible próximamente."));
+        btn.setOnAction(e -> uiHelper.showInfo(
+                "Curso: " + curso.titulo(),
+                "El contenido estará disponible próximamente."
+        ));
 
         card.getChildren().addAll(title, nivel, btn);
         return card;
     }
 
-    // Carga los cursos que el usuario puede inscribir.
     private void cargarCursosDisponibles() {
+        if (cursosActuales == null) return;
+
         cursosDisponiblesContainer.getChildren().clear();
         for (CursoResponse curso : cursosActuales.cursosDisponibles()) {
             VBox card = crearTarjetaCursoDisponible(curso);
@@ -122,7 +135,6 @@ public class PrincipalController implements Initializable {
         }
     }
 
-    // Crea visualmente una tarjeta para un curso disponible.
     private VBox crearTarjetaCursoDisponible(CursoResponse curso) {
         VBox card = new VBox(10);
         card.setPrefSize(300, 200);
@@ -140,8 +152,12 @@ public class PrincipalController implements Initializable {
         return card;
     }
 
-    // ====== LÓGICA DE INSCRIPCIÓN ======
     private void inscribirCurso(int cursoId) {
+        if (usuarioActualId == null) {
+            uiHelper.showError("Error", "No hay usuario autenticado.");
+            return;
+        }
+
         try {
             InscripcionRequest request = new InscripcionRequest(usuarioActualId, cursoId);
             cursosActuales = listarCursosService.inscribirCurso(request);
@@ -153,7 +169,6 @@ public class PrincipalController implements Initializable {
         }
     }
 
-    // ====== BÚSQUEDA ======
     private void configurarBusqueda() {
         if (searchField != null) {
             searchField.textProperty().addListener((obs, oldVal, newVal) -> buscarCurso());
@@ -162,6 +177,8 @@ public class PrincipalController implements Initializable {
 
     @FXML
     private void buscarCurso() {
+        if (cursosActuales == null) return;
+
         String texto = searchField.getText().toLowerCase();
         if (texto.isBlank()) {
             cargarCursosDisponibles();
@@ -183,7 +200,6 @@ public class PrincipalController implements Initializable {
         }
     }
 
-    // ====== ANIMACIÓN DE SCROLL ======
     private void configurarFlechas() {
         if (leftArrow != null && rightArrow != null) {
             leftArrow.setOnAction(e -> scrollLeft());
@@ -193,6 +209,7 @@ public class PrincipalController implements Initializable {
 
     @FXML
     private void scrollLeft() { scrollHorizontally(cursosDisponiblesScroll, -0.3); }
+
     @FXML
     private void scrollRight() { scrollHorizontally(cursosDisponiblesScroll, 0.3); }
 
@@ -205,7 +222,6 @@ public class PrincipalController implements Initializable {
         timeline.play();
     }
 
-    // ====== NAVEGACIÓN INFERIOR ======
     @FXML private void goHome()        { uiHelper.showInfo("Inicio", "Ya estás en la pantalla principal."); }
     @FXML private void goForum()       { uiHelper.showInfo("Foro", "Pantalla de foro aún no implementada."); }
     @FXML private void goAchievements(){ uiHelper.showInfo("Logros", "Pantalla de logros aún no implementada."); }
